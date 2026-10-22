@@ -70,15 +70,10 @@ if (process.env.NODE_ENV === "development") {
 const { apiLimiter } = require("./src/middleware/rateLimiter");
 app.use("/api", apiLimiter);
 
-// 7. System Health Check Endpoint
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    status: "online",
-    system: "Sky Wardens Operational Aerospace & Defence Backend",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
-  });
-});
+// 7. System Health Check Endpoints (both /health and /api/health)
+const { router: healthRoutes } = require("./src/routes/healthRoutes");
+app.use("/health", healthRoutes);
+app.use("/api/health", healthRoutes);
 
 // 8. Mount Modular API Routes
 app.use("/api/auth", require("./src/routes/authRoutes"));
