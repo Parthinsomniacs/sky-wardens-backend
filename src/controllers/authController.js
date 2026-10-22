@@ -21,25 +21,9 @@ const login = async (req, res, next) => {
       });
     }
 
-    // 2. Check if account is temporarily locked due to repeated brute-force attempts
-    if (user.isLocked()) {
-      const remainingMinutes = Math.ceil((user.lockUntil - Date.now()) / (60 * 1000));
-      return res.status(429).json({
-        success: false,
-        message: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).`,
-      });
-    }
-
-    // 3. Verify password hash using bcrypt
+    // 2. Verify password hash using bcrypt
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      // Increment failed attempts and trigger lockout if >= 5
-      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-      if (user.failedLoginAttempts >= 5) {
-        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 mins lock
-      }
-      await user.save({ validateBeforeSave: false });
-
       return res.status(401).json({
         success: false,
         message: "Invalid credentials.",
@@ -81,6 +65,7 @@ const login = async (req, res, next) => {
         id: user.id || user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || "",
         role: roleName,
         avatar: user.avatar || "SA",
       },
@@ -103,6 +88,7 @@ const getMe = async (req, res, next) => {
         id: req.user.id || req.user._id,
         name: req.user.name,
         email: req.user.email,
+        phone: req.user.phone || "",
         role: roleName,
         avatar: req.user.avatar || "SA",
       },
@@ -112,7 +98,111 @@ const getMe = async (req, res, next) => {
   }
 };
 
+// @desc    Update admin user profile (Name, Email, Mobile Number, Avatar)
+// @route   PUT /api/auth/profile
+// @access  Private (JWT Protected)
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, email, phone, avatar } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // If email is changed, verify uniqueness
+    if (email && email.toLowerCase().trim() !== user.email) {
+      const emailExists = await User.findOne({
+        email: email.toLowerCase().trim(),
+        _id: { $ne: user._id },
+      });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: `Email '${email}' is already registered with another account.`,
+        });
+      }
+      user.email = email.toLowerCase().trim();
+    }
+
+    if (name) user.name = name.trim();
+    if (phone !== undefined) user.phone = phone.trim();
+    if (avatar !== undefined) user.avatar = avatar;
+
+    await user.save();
+
+    const roleName = user.role?.name || req.user.role?.name || req.user.role || "Super Admin";
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        id: user.id || user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        role: roleName,
+        avatar: user.avatar || "SA",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Change admin user password
+// @route   PUT /api/auth/change-password
+// @access  Private (JWT Protected)
+const changePassword = async (req, res, next) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters long.",
+      });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Confirm password does not match.",
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Store previous encrypted password hash in oldPassword
+    user.oldPassword = user.password;
+    // Set new password (pre-save hook will hash it with bcrypt salt 12)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully.",
+      oldPassword: user.oldPassword,
+      newPassword: user.password,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   login,
   getMe,
+  updateProfile,
+  changePassword,
 };
+

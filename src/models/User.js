@@ -25,11 +25,26 @@ const userSchema = new mongoose.Schema(
         "Please provide a valid email",
       ],
     },
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+      validate: {
+        validator: function (v) {
+          return !v || /^[0-9]{10}$/.test(v);
+        },
+        message: "Mobile number must be exactly 10 digits",
+      },
+    },
     password: {
       type: String,
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
       select: false, // Don't return password hash by default
+    },
+    oldPassword: {
+      type: String,
+      default: "",
     },
     role: {
       type: mongoose.Schema.Types.ObjectId,

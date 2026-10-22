@@ -1,11 +1,32 @@
 const Division = require("../models/Division");
+const Product = require("../models/Product");
+
+const escapeRegex = (string) => {
+  return string ? string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&") : "";
+};
+
+const findDivisionByIdentifier = async (identifier) => {
+  if (!identifier) return null;
+  // If valid MongoDB ObjectId
+  if (typeof identifier === "string" && identifier.match(/^[0-9a-fA-F]{24}$/)) {
+    const found = await Division.findById(identifier);
+    if (found) return found;
+  }
+  // Try by slug or name (case-insensitive)
+  return await Division.findOne({
+    $or: [
+      { slug: identifier },
+      { name: new RegExp(`^${escapeRegex(identifier)}$`, "i") },
+    ],
+  });
+};
 
 // @desc    Get all divisions
 // @route   GET /api/divisions
 // @access  Public
 const getDivisions = async (req, res, next) => {
   try {
-    const divisions = await Division.find().sort({ createdAt: 1 });
+    const divisions = await Division.find().sort({ order: 1, createdAt: 1 });
     res.status(200).json({
       success: true,
       count: divisions.length,
@@ -18,12 +39,25 @@ const getDivisions = async (req, res, next) => {
 
 // @desc    Create new division
 // @route   POST /api/divisions
-// @access  Private (Admin)
+// @access  Private (Admin / Super Admin clearance)
 const createDivision = async (req, res, next) => {
   try {
-    const { name, description, status, badgeColor } = req.body;
+    const {
+      name,
+      description,
+      status,
+      badgeColor,
+      sector,
+      buttonText,
+      imageSrc,
+      imageAlt,
+      logoSrc,
+      logoAlt,
+      href,
+      order,
+    } = req.body;
 
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
         message: "Division name is required.",
@@ -49,6 +83,14 @@ const createDivision = async (req, res, next) => {
       description: description?.trim() || "",
       status: status || "Active",
       badgeColor: badgeColor || "bg-indigo-600",
+      sector: sector?.trim() || "",
+      buttonText: buttonText?.trim() || `Explore ${name.trim()}`,
+      imageSrc: imageSrc?.trim() || "",
+      imageAlt: imageAlt?.trim() || "",
+      logoSrc: logoSrc?.trim() || "",
+      logoAlt: logoAlt?.trim() || "",
+      href: href?.trim() || `/products/${slug}`,
+      order: typeof order === "number" ? order : 0,
     });
 
     res.status(201).json({
@@ -63,18 +105,11 @@ const createDivision = async (req, res, next) => {
 
 // @desc    Update division
 // @route   PUT /api/divisions/:id
-// @access  Private (Admin)
+// @access  Private (Admin / Super Admin clearance)
 const updateDivision = async (req, res, next) => {
   try {
     const identifier = req.params.id;
-
-    let division = await Division.findOne({
-      $or: [{ id: identifier }, { slug: identifier }],
-    });
-
-    if (!division && identifier.match(/^[0-9a-fA-F]{24}$/)) {
-      division = await Division.findById(identifier);
-    }
+    const division = await findDivisionByIdentifier(identifier);
 
     if (!division) {
       return res.status(404).json({
@@ -83,25 +118,50 @@ const updateDivision = async (req, res, next) => {
       });
     }
 
-    const updated = await Division.findByIdAndUpdate(division._id, req.body, {
-      new: true,
-      runValidators: true,
+    const oldName = division.name;
+
+    // Safe update with validated fields only (Prevent Mass Assignment)
+    const allowedFields = [
+      "name",
+      "description",
+      "status",
+      "badgeColor",
+      "sector",
+      "buttonText",
+      "imageSrc",
+      "imageAlt",
+      "logoSrc",
+      "logoAlt",
+      "href",
+      "order",
+    ];
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        division[field] = req.body[field];
+      }
     });
 
-    // Cascade status to all products belonging to this division
+    // Re-generate slug if name changed
+    if (req.body.name && req.body.name.trim() !== oldName) {
+      division.slug = req.body.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+    }
+
+    const updated = await division.save();
+
+    // Cascade status update to all products belonging to this division
     if (req.body.status) {
-      const Product = require("../models/Product");
+      const escapedOldName = escapeRegex(oldName);
       await Product.updateMany(
-        { division: new RegExp(`^${division.name}$`, "i") },
+        { division: new RegExp(`^${escapedOldName}$`, "i") },
         { status: req.body.status }
       );
     }
 
     // Cascade division name update if changed
-    if (req.body.name && req.body.name.trim() !== division.name) {
-      const Product = require("../models/Product");
+    if (req.body.name && req.body.name.trim() !== oldName) {
+      const escapedOldName = escapeRegex(oldName);
       await Product.updateMany(
-        { division: new RegExp(`^${division.name}$`, "i") },
+        { division: new RegExp(`^${escapedOldName}$`, "i") },
         { division: req.body.name.trim() }
       );
     }
@@ -118,18 +178,11 @@ const updateDivision = async (req, res, next) => {
 
 // @desc    Delete division
 // @route   DELETE /api/divisions/:id
-// @access  Private (Admin)
+// @access  Private (Super Admin clearance)
 const deleteDivision = async (req, res, next) => {
   try {
     const identifier = req.params.id;
-
-    let division = await Division.findOne({
-      $or: [{ id: identifier }, { slug: identifier }],
-    });
-
-    if (!division && identifier.match(/^[0-9a-fA-F]{24}$/)) {
-      division = await Division.findById(identifier);
-    }
+    const division = await findDivisionByIdentifier(identifier);
 
     if (!division) {
       return res.status(404).json({
@@ -138,11 +191,9 @@ const deleteDivision = async (req, res, next) => {
       });
     }
 
-    // Protect core Aerospace and Defence divisions
-    if (
-      division.name.toLowerCase() === "aerospace" ||
-      division.name.toLowerCase() === "defence"
-    ) {
+    // Protect core Aerospace and Defence divisions from deletion
+    const normalizedName = division.name.toLowerCase();
+    if (normalizedName === "aerospace" || normalizedName === "defence") {
       return res.status(400).json({
         success: false,
         message: "Core divisions (Aerospace & Defence) cannot be deleted.",

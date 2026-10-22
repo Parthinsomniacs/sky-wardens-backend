@@ -70,7 +70,15 @@ const leadSchema = new mongoose.Schema(
     },
     date: {
       type: String,
-      default: () => new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
+      default: () =>
+        new Date().toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }),
     },
     timestamp: {
       type: String,
@@ -78,7 +86,7 @@ const leadSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["New", "In Discussion", "Contacted", "Closed"],
+      enum: ["New", "In Discussion", "Contacted", "Converted", "Closed"],
       default: "New",
     },
     priority: {
@@ -97,11 +105,11 @@ const leadSchema = new mongoose.Schema(
   }
 );
 
-// Auto-assign human-friendly ID if not present
+// Auto-assign sequential numeric ID (1, 2, 3...) if not present
 leadSchema.pre("save", async function () {
   if (!this.id) {
     const count = await this.constructor.countDocuments();
-    this.id = `INQ-${String(count + 1).padStart(4, "0")}`;
+    this.id = String(count + 1);
   }
 });
 
