@@ -8,6 +8,13 @@ const morgan = require("morgan");
 // Load Environment Variables
 dotenv.config();
 
+// Debug: Log which critical env vars are available (values hidden for security)
+console.log("[ENV DEBUG] MONGO_URI:", process.env.MONGO_URI ? "✅ SET" : "❌ NOT SET");
+console.log("[ENV DEBUG] MONGODB_URI:", process.env.MONGODB_URI ? "✅ SET" : "❌ NOT SET");
+console.log("[ENV DEBUG] JWT_SECRET:", process.env.JWT_SECRET ? "✅ SET" : "❌ NOT SET");
+console.log("[ENV DEBUG] NODE_ENV:", process.env.NODE_ENV || "NOT SET");
+console.log("[ENV DEBUG] PORT:", process.env.PORT || "NOT SET");
+
 // Connect Database
 const connectDB = require("./src/config/db");
 connectDB();
