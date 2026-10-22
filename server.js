@@ -70,8 +70,9 @@ if (process.env.NODE_ENV === "development") {
 const { apiLimiter } = require("./src/middleware/rateLimiter");
 app.use("/api", apiLimiter);
 
-// 7. System Health Check Endpoints (both /health and /api/health)
-const { router: healthRoutes } = require("./src/routes/healthRoutes");
+// 7. System Health Check Endpoints (Root /, /health, and /api/health)
+const { router: healthRoutes, getHealthStatus } = require("./src/routes/healthRoutes");
+app.get("/", getHealthStatus);
 app.use("/health", healthRoutes);
 app.use("/api/health", healthRoutes);
 
@@ -89,7 +90,7 @@ app.use(errorHandler);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`====================================================`);
   console.log(` SKY WARDENS DEFENCE API RUNNING ON PORT : ${PORT}`);
   console.log(` HEALTH CHECK                            : http://localhost:${PORT}/api/health`);
