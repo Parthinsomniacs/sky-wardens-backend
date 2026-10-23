@@ -3,9 +3,8 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const sync = async () => {
-  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/sky_wardens_db";
+  const uri = process.env.MONGO_URI || process.env.MONGO_URI_LOCAL;
   await mongoose.connect(uri);
-  console.log("Connected to", uri);
 
   await mongoose.connection.collection("divisions").updateOne(
     { slug: "aerospace" },

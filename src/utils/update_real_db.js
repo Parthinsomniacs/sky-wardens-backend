@@ -3,8 +3,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "../../.env") });
 
 async function updateActualDb() {
-  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/sky_wardens_db";
-  console.log("Connecting to:", uri);
+  const uri = process.env.MONGO_URI || process.env.MONGO_URI_LOCAL;
   await mongoose.connect(uri);
   const collection = mongoose.connection.collection("divisions");
 

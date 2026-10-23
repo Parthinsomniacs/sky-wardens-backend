@@ -8,13 +8,6 @@ const morgan = require("morgan");
 // Load Environment Variables
 dotenv.config();
 
-// Debug: Log which critical env vars are available (values hidden for security)
-console.log("[ENV DEBUG] MONGO_URI:", process.env.MONGO_URI ? "✅ SET" : "❌ NOT SET");
-console.log("[ENV DEBUG] MONGODB_URI:", process.env.MONGODB_URI ? "✅ SET" : "❌ NOT SET");
-console.log("[ENV DEBUG] JWT_SECRET:", process.env.JWT_SECRET ? "✅ SET" : "❌ NOT SET");
-console.log("[ENV DEBUG] NODE_ENV:", process.env.NODE_ENV || "NOT SET");
-console.log("[ENV DEBUG] PORT:", process.env.PORT || "NOT SET");
-
 // Connect Database
 const connectDB = require("./src/config/db");
 connectDB();
@@ -24,10 +17,10 @@ const app = express();
 // 1. Security Headers
 app.use(helmet());
 
-// 2. CORS Whitelist
+// 2. CORS Whitelist (configured strictly via CLIENT_URLS in .env)
 const allowedOrigins = process.env.CLIENT_URLS
-  ? process.env.CLIENT_URLS.split(",").map((url) => url.trim())
-  : ["http://localhost:5173", "http://localhost:3000", "http://localhost:5174"];
+  ? process.env.CLIENT_URLS.split(",").map((url) => url.trim()).filter(Boolean)
+  : [];
 
 app.use(
   cors({
@@ -98,11 +91,7 @@ app.use(errorHandler);
 // Start Server
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`====================================================`);
-  console.log(` SKY WARDENS DEFENCE API RUNNING ON PORT : ${PORT}`);
-  console.log(` HEALTH CHECK                            : http://localhost:${PORT}/api/health`);
-  console.log(` ENVIRONMENT                             : ${process.env.NODE_ENV || "development"}`);
-  console.log(`====================================================`);
+  console.log(`Sky Wardens API running on port ${PORT}`);
 });
 
 // Handle unhandled promise rejections

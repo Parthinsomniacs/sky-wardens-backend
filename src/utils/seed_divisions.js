@@ -3,7 +3,7 @@ require("dotenv").config();
 const Division = require("../models/Division");
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/sky_wardens");
+  await mongoose.connect(process.env.MONGO_URI || process.env.MONGO_URI_LOCAL);
   await Division.updateOne(
     { slug: "aerospace" },
     {
