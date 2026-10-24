@@ -57,12 +57,13 @@ const productSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["spec-grid", "text", "features"],
+          enum: ["spec-grid", "text", "features", "table", "list"],
           default: "spec-grid",
         },
         title: String,
         body: String,
-        items: [
+        items: mongoose.Schema.Types.Mixed,
+        rows: [
           {
             label: String,
             value: String,
